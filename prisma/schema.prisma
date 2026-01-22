@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Admin users for dashboard access
+model Admin {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Customers (optional login via OTP)
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  mobile    String   @unique
+  otpCode   String?
+  otpExpiry DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+// Menu categories
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items     MenuItem[]
+}
+
+// Menu items
+model MenuItem {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  image       String?
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orderItems  OrderItem[]
+}
+
+// Pickup locations
+model PickupLocation {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+// Time slot configuration
+model TimeSlotConfig {
+  id            String   @id @default(uuid())
+  startTime     String   // "09:00"
+  endTime       String   // "22:00"
+  slotDuration  Int      @default(15) // minutes
+  maxOrdersPerSlot Int   @default(5)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Orders
+model Order {
+  id               String   @id @default(uuid())
+  orderNumber      String   @unique
+
+  // Customer info (stored directly for guest orders)
+  customerName     String
+  customerMobile   String
+  customerId       String?
+  customer         Customer? @relation(fields: [customerId], references: [id])
+
+  // Pickup details
+  pickupLocationId String
+  pickupLocation   PickupLocation @relation(fields: [pickupLocationId], references: [id])
+  pickupTime       DateTime
+
+  // Payment
+  totalAmount      Float
+  paymentStatus    PaymentStatus @default(PENDING)
+  razorpayOrderId  String?  @unique
+  razorpayPaymentId String?
+
+  // Order status
+  status           OrderStatus @default(PENDING)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  items            OrderItem[]
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity   Int
+  unitPrice  Float
+  cupNames   String[] // Array of names for each cup
+  createdAt  DateTime @default(now())
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
